@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffc107"/>
+    <link rel="manifest" href="manifest.json">
+    <title>Tạo QR Nhanh</title>
+    <style>
+        :root { --bg-color: #f4f4f9; --container-bg: #ffffff; --text-color: #212529; --border-color: #ddd; --legend-color: #333; --input-bg: #ffffff; --input-border: #ccc; }
+        [data-theme="dark"] { --bg-color: #121212; --container-bg: #1e1e1e; --text-color: #e0e0e0; --border-color: #444; --legend-color: #e0e0e0; --input-bg: #2c2c2c; --input-border: #555; }
+        body { font-family: sans-serif; padding: 20px; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; box-sizing: border-box; transition: background-color 0.3s, color 0.3s; }
+        .container { max-width: 400px; width: 100%; background: var(--container-bg); padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); text-align: center; transition: background-color 0.3s; }
+        fieldset { border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; margin-bottom: 20px; text-align: left; }
+        legend { font-weight: bold; color: var(--legend-color); padding: 0 5px; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--input-border); border-radius: 4px; box-sizing: border-box; font-size: 16px; background-color: var(--input-bg); color: var(--text-color); }
+        .tag-wrapper { display: flex; align-items: center; gap: 5px; }
+        .tag-wrapper input { flex-grow: 1; }
+        .time-suggestion-btn { padding: 8px 10px; font-size: 18px; background: none; border: 1px solid var(--input-border); border-radius: 4px; cursor: pointer; }
+        .generate-button { width: 100%; padding: 12px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s ease; height: 50px; background-color: #ffc107; color: #000; }
+        #location-display { font-size: 12px; opacity: 0.7; margin: -5px 0 15px; min-height: 16px; font-style: italic; }
+        #qrcode-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 1000; padding: 10px; box-sizing: border-box; }
+        #qrcode { width: 90vw; max-width: 450px; max-height: 65vh; object-fit: contain; height: auto; background: white; padding: 15px; border-radius: 8px; }
+        #qr-info { margin-top: 10px; font-size: 12px; color: #fff; opacity: 0.5; font-weight: normal; text-align: center; max-width: 90%; }
+        .settings-button, .theme-toggle { position: absolute; top: 15px; font-size: 24px; cursor: pointer; color: var(--text-color); background: none; border: none; z-index: 1001; }
+        .settings-button { left: 15px; }
+        .theme-toggle { right: 15px; }
+        #qr-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 15px; width: 100%; }
+        .action-button { padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background-color 0.3s ease; text-decoration: none; display: flex; justify-content: center; align-items: center; border: none; }
+        .download-button { background-color: #007bff; color: white; }
+        .edit-button { background-color: #6c757d; color: white; }
+        .back-button { background-color: #dc3545; color: white; }
+        .share-button { background-color: #17a2b8; color: white; }
+        #settings-modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+        .modal-content { background-color: var(--container-bg); margin: 10% auto; padding: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 500px; border-radius: 8px; position: relative; }
+        .modal-content .close-button { color: var(--text-color); position: absolute; top: 10px; right: 20px; font-size: 28px; }
+    </style>
+</head>
+<body>
+    <button class="settings-button" onclick="openSettings()">⚙️</button>
+    <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
+    
+    <div class="container" id="main-form">
+        <fieldset><legend>Thông tin khách hàng</legend><input type="text" id="customerName" placeholder="Tên khách" list="recent-customers"><datalist id="recent-customers"></datalist><div class="tag-wrapper"><input type="text" id="tag" placeholder="Tag/Ghi chú"><button class="time-suggestion-btn" onclick="addTimestampToTag()">🕒</button></div></fieldset>
+        <fieldset><legend>Thông tin giao dịch</legend><input type="number" id="amount" placeholder="Số tiền (tùy chọn)"></fieldset>
+        <p id="location-display">Vị trí: Đang xác định...</p>
+        <button class="generate-button" onclick="updateQR()">Tạo Mã QR</button>
+    </div>
+
+    <div id="qrcode-container">
+        <img id="qrcode" alt="Mã QR">
+        <p id="qr-info"></p>
+        <div id="qr-actions">
+            <button class="action-button back-button" onclick="closeQR()">Trở lại</button>
+            <button class="action-button edit-button" onclick="editInfo()">Chỉnh sửa</button>
+            <a id="download-link" class="action-button download-button" href="#" download="QR-ThanhToan.png">Tải xuống</a>
+            <!-- NÂNG CẤP 1: Nút Chia sẻ -->
+            <button class="action-button share-button" id="share-button" onclick="shareQR()">Chia sẻ</button>
+        </div>
+    </div>
+
+    <div id="settings-modal"><div class="modal-content"><span class="close-button" onclick="closeSettings()">&times;</span><h2>Cài đặt</h2><fieldset><legend>Thông tin Ngân hàng</legend><label for="bankCode">Ngân hàng:</label><select id="bankCode"></select><label for="accountNumber">Số tài khoản:</label><input type="text" id="accountNumber" placeholder="Nhập số tài khoản"><label for="accountName">Tên chủ tài khoản:</label><input type="text" id="accountName" placeholder="Tên viết hoa, không dấu"></fieldset><fieldset><legend>Tùy chỉnh Lời nhắn</legend><label for="overrideMessage">Lời nhắn ghi đè (tùy chọn):</label><textarea id="overrideMessage" rows="2" placeholder="Nếu có nội dung, sẽ thay thế lời nhắn mặc định"></textarea></fieldset><button class="generate-button" style="background-color: #28a745" onclick="saveSettings()">Lưu Cài đặt</button></div></div>
+
+    <script>
+        let bankInfo = {}, currentDetectedLocation = "vi tri khong ro";
+        const recentCustomersKey = 'recentCustomers', bankInfoKey = 'bankInfo', MAX_MESSAGE_LENGTH = 97;
+
+        document.addEventListener('DOMContentLoaded', () => { initApp(); registerServiceWorker(); });
+        
+        // --- CORE APP LOGIC ---
+        function initApp() {
+            loadBankInfo();
+            loadRecentCustomers();
+            updateLocationDisplay();
+            applyTheme();
+            // Ẩn nút chia sẻ nếu trình duyệt không hỗ trợ
+            if (!navigator.share) {
+                document.getElementById('share-button').style.display = 'none';
+            }
+        }
+
+        async function updateQR() { /* ... (hàm này không đổi) ... */ if(!navigator.onLine){alert("Không có kết nối mạng.");return}const button=document.querySelector('.generate-button');button.textContent='Đang xử lý...';button.disabled=true;let finalMessage;const overrideMessage=bankInfo.overrideMessage?.trim();if(overrideMessage){finalMessage=sanitizeString(overrideMessage).substring(0,MAX_MESSAGE_LENGTH)}else{const nameInput=document.getElementById("customerName").value.trim();const tagInput=sanitizeString(document.getElementById("tag").value);const isDefaultUser=nameInput==="";const rawCustomerName=isDefaultUser?"Quy khach":nameInput;const cleanRawName=sanitizeString(rawCustomerName);let customerNameForMessage,salutation;if(isDefaultUser){salutation='Quy ac';customerNameForMessage=cleanRawName}else{const words=cleanRawName.split(/\s+/);const firstWord=words[0].toLowerCase();if(['anh','a','chi','c'].includes(firstWord)){salutation=(firstWord==='anh'||firstWord==='a')?'anh':'chi';customerNameForMessage=cleanRawName}else{salutation='Quy ac';customerNameForMessage=`Quy ac ${cleanRawName}`}}const baseTemplate=`Cam on [Ten] da tin tuong dich vu. Chuc ${salutation} mot ngay tot lanh tai [Dia diem]`;let tempMessage,finalName=customerNameForMessage,finalLocation=currentDetectedLocation;for(let i=0;i<2;i++){tempMessage=baseTemplate.replace('[Ten]',finalName).replace('[Dia diem]',finalLocation);if(tempMessage.length<=MAX_MESSAGE_LENGTH)break;const overflow=tempMessage.length-MAX_MESSAGE_LENGTH;if(i===0&&!isDefaultUser&&cleanRawName.split(/\s+/).length>2){finalName=shortenCustomerName(customerNameForMessage);continue}if(finalLocation.length>overflow){finalLocation=finalLocation.substring(0,finalLocation.length-overflow)}};finalMessage=baseTemplate.replace('[Ten]',finalName).replace('[Dia diem]',finalLocation);if(tagInput){const remainingSpace=MAX_MESSAGE_LENGTH-finalMessage.length-1;if(remainingSpace>0){const trimmedTag=tagInput.substring(0,remainingSpace);finalMessage+=` ${trimmedTag}`}}}const amountInput=document.getElementById("amount").value;const payload={acqId:parseInt(bankInfo.code),accountNo:bankInfo.number,accountName:bankInfo.name,template:'compact2',addInfo:finalMessage};if(amountInput&&parseInt(amountInput)>0){payload.amount=parseInt(amountInput)}try{const response=await fetch('https://api.vietqr.io/v2/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!response.ok)throw new Error((await response.json()).desc||'Lỗi API');const data=await response.json();if(data.code==='00'&&data.data.qrDataURL){const qrImgURL=data.data.qrDataURL;document.getElementById("qrcode").src=qrImgURL;document.getElementById("download-link").href=qrImgURL;document.getElementById("qr-info").textContent=`Noi dung: ${finalMessage} (${finalMessage.length} ky tu)`;document.getElementById("qrcode-container").style.display='flex';document.getElementById("main-form").style.display='none';if(document.getElementById("customerName").value.trim())saveCustomerName(document.getElementById("customerName").value.trim())}else{alert('Lỗi: '+(data.desc||'Không thể tạo mã QR.'))}}catch(error){alert('Có lỗi xảy ra: '+error.message)}finally{button.textContent='Tạo Mã QR';button.disabled=false}};
+        
+        // --- UI & SETTINGS MANAGEMENT ---
+        function loadBankInfo(){const savedInfo=JSON.parse(localStorage.getItem(bankInfoKey));bankInfo=savedInfo||{code:"970418",number:"0915118319",name:"DAO THE HOANG",overrideMessage:""};populateBankList()};function saveSettings(){bankInfo={code:document.getElementById('bankCode').value,number:document.getElementById('accountNumber').value.trim(),name:document.getElementById('accountName').value.trim().toUpperCase(),overrideMessage:document.getElementById('overrideMessage').value.trim()};if(!bankInfo.code||!bankInfo.number||!bankInfo.name){alert("Vui lòng điền đầy đủ thông tin ngân hàng.");return}localStorage.setItem(bankInfoKey,JSON.stringify(bankInfo));alert("Đã lưu cài đặt!");closeSettings()};async function populateBankList(){const select=document.getElementById('bankCode');select.innerHTML='<option>Đang tải...</option>';try{const response=await fetch('https://api.vietqr.io/v2/banks');const data=await response.json();if(data.code==='00'){select.innerHTML='';data.data.forEach(bank=>{const option=document.createElement('option');option.value=bank.bin;option.textContent=`${bank.shortName} - ${bank.name}`;if(bank.bin==bankInfo.code)option.selected=true;select.appendChild(option)})}}catch(e){select.innerHTML='<option>Lỗi tải danh sách</option>'}};
+        function openSettings(){document.getElementById('bankCode').value=bankInfo.code;document.getElementById('accountNumber').value=bankInfo.number;document.getElementById('accountName').value=bankInfo.name;document.getElementById('overrideMessage').value=bankInfo.overrideMessage||'';document.getElementById('settings-modal').style.display='block'};
+        
+        // CẢI TIẾN 1: Sửa lỗi nút thời gian
+        function addTimestampToTag() {
+            const now = new Date();
+            const timeString = `${now.getHours()}h${String(now.getMinutes()).padStart(2, '0')}`;
+            const tagInput = document.getElementById('tag');
+            const timeRegex = /\s?\d{1,2}h\d{2}/g; // Regex để tìm timestamp cũ
+            // Xóa timestamp cũ và thêm timestamp mới vào cuối
+            tagInput.value = (tagInput.value.replace(timeRegex, '').trim() + ' ' + timeString).trim();
+        }
+
+        async function shareQR() {
+            const qrImg = document.getElementById('qrcode');
+            try {
+                // Chuyển đổi data URL (base64) thành file để chia sẻ
+                const response = await fetch(qrImg.src);
+                const blob = await response.blob();
+                const file = new File([blob], 'QR-ThanhToan.png', { type: blob.type });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Mã QR Thanh Toán',
+                        text: 'Quét mã này để thanh toán.'
+                    });
+                } else {
+                    throw new Error('Không thể chia sẻ file này.');
+                }
+            } catch (error) {
+                console.error('Lỗi chia sẻ:', error);
+                alert('Không thể chia sẻ QR. Vui lòng thử tải xuống.');
+            }
+        }
+        
+        // ... (Các hàm UI và utility khác không đổi) ...
+        function closeSettings(){document.getElementById('settings-modal').style.display='none'};function closeQR(){document.getElementById("qrcode-container").style.display='none';document.getElementById("main-form").style.display='block';document.getElementById("customerName").value='';document.getElementById("tag").value='';document.getElementById("amount").value='';document.getElementById("customerName").focus()};function editInfo(){document.getElementById("qrcode-container").style.display='none';document.getElementById("main-form").style.display='block';document.getElementById("customerName").focus()};function applyTheme(){const savedTheme=localStorage.getItem('theme')||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',savedTheme)};function toggleTheme(){const currentTheme=document.documentElement.getAttribute('data-theme');const newTheme=currentTheme==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',newTheme);localStorage.setItem('theme',newTheme)};function registerServiceWorker(){if('serviceWorker'in navigator){navigator.serviceWorker.register('./service-worker.js').then(reg=>console.log('SW Registered')).catch(err=>console.log('SW Not Registered',err))}};async function updateLocationDisplay(){const locationDisplay=document.getElementById('location-display');const location=await getCurrentLocation();if(location){const address=await getAddressFromCoordinates(location.latitude,location.longitude);currentDetectedLocation=sanitizeString(address);locationDisplay.textContent=`Vị trí: ${address}`}else{locationDisplay.textContent=`Vị trí: Không thể xác định`}};function loadRecentCustomers(){const recentCustomers=JSON.parse(localStorage.getItem(recentCustomersKey))||[];const datalist=document.getElementById('recent-customers');datalist.innerHTML='';recentCustomers.forEach(name=>{const option=document.createElement('option');option.value=name;datalist.appendChild(option)})};function saveCustomerName(name){if(!name)return;let recentCustomers=JSON.parse(localStorage.getItem(recentCustomersKey))||[];recentCustomers=recentCustomers.filter(item=>item.toLowerCase()!==name.toLowerCase());recentCustomers.unshift(name);const limitedList=recentCustomers.slice(0,10);localStorage.setItem(recentCustomersKey,JSON.stringify(limitedList));loadRecentCustomers()};function sanitizeString(str){let sanitized=str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D');sanitized=sanitized.replace(/[^a-zA-Z0-9 ]/g,'');return sanitized.trim()};function shortenCustomerName(fullName){const words=fullName.trim().split(/\s+/);if(words.length<=2)return fullName;const salutation=words[0].toLowerCase();const lastName=words[words.length-1];if(['chi','c'].includes(salutation))return`c ${lastName}`;if(['anh','a'].includes(salutation))return`a ${lastName}`;return fullName};function getCurrentLocation(){return new Promise(resolve=>navigator.geolocation?navigator.geolocation.getCurrentPosition(pos=>resolve({latitude:pos.coords.latitude,longitude:pos.coords.longitude}),()=>resolve(null),{timeout:5000}):resolve(null))};async function getAddressFromCoordinates(lat,lng){try{const response=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=vi&zoom=18`);const data=await response.json();return data?.address?.road||data?.address?.suburb||data?.address?.city_district||"vi tri khong ro"}catch(error){return"vi tri khong ro"}};
+    </script>
+</body>
+</html>
